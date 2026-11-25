@@ -8,22 +8,44 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     * { box-sizing: border-box; }
-    body, html { margin: 0; padding: 0; height: 100%; font-family: sans-serif; }
+    body, html { margin: 0; padding: 0; height: 100%; font-family: sans-serif; overflow: hidden; }
     #map { width: 100%; height: 100%; }
 
-    /* 上部バー */
-    .top-bar { position: fixed; top: 10px; left: 10px; right: 10px; z-index: 1000; display: flex; gap: 8px; pointer-events: none; }
-    .btn { pointer-events: auto; padding: 10px 14px; background: #fff; border: 2px solid #333; border-radius: 8px; font-weight: bold; font-size: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.25); cursor: pointer; }
+    /* 上部検索＆操作バー */
+    .top-container { position: fixed; top: 10px; left: 50px; right: 10px; z-index: 1000; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+    .search-row { display: flex; gap: 6px; pointer-events: auto; }
+    .search-input { flex: 1; padding: 10px 12px; border: 2px solid #333; border-radius: 8px; font-size: 15px; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.2); min-width: 0; }
+    .btn { pointer-events: auto; padding: 10px 12px; background: #fff; border: 2px solid #333; border-radius: 8px; font-weight: bold; font-size: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.2); cursor: pointer; white-space: nowrap; }
+    .btn-qr { background: #111827; color: #fff; border-color: #111827; }
+
+    /* 検索結果リスト */
+    .search-results { pointer-events: auto; background: #fff; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); max-height: 220px; overflow-y: auto; display: none; }
+    .search-item { padding: 12px; border-bottom: 1px solid #eee; font-size: 14px; cursor: pointer; }
+    .search-item:last-child { border-bottom: none; }
+    .search-item:active { background: #f3f4f6; }
+
+    /* 右下現在地ボタン */
     .btn-gps { position: fixed; bottom: 24px; right: 16px; z-index: 1000; background: #2563eb; color: #fff; border: none; padding: 14px 18px; border-radius: 50px; font-size: 15px; }
+
+    /* 現在地の青い丸マーク */
+    .current-loc-dot {
+      width: 18px;
+      height: 18px;
+      background: #2563eb;
+      border: 3px solid #ffffff;
+      border-radius: 50%;
+      box-shadow: 0 0 8px rgba(37, 99, 235, 0.8);
+    }
 
     /* ポップアップ内ボタン */
     .popup-btn { display: block; width: 100%; text-align: center; margin-top: 6px; padding: 8px; border-radius: 6px; font-weight: bold; text-decoration: none; border: none; cursor: pointer; font-size: 13px; }
     .gmap { background: #4285F4; color: #fff; }
+    .add-here { background: #16a34a; color: #fff; }
     .edit { background: #f3f4f6; color: #111; border: 1px solid #ccc; }
     .del { background: #fee2e2; color: #b91c1c; }
 
-    /* モーダル */
-    .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center; padding: 16px; }
+    /* モーダル共通 */
+    .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 2000; align-items: center; justify-content: center; padding: 16px; }
     .modal-box { background: #fff; width: 100%; max-width: 400px; border-radius: 12px; padding: 20px; }
     .modal-box h3 { margin: 0 0 12px; }
     .modal-box input, .modal-box textarea { width: 100%; padding: 10px; margin-bottom: 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; }
@@ -31,15 +53,21 @@
     .modal-actions button { flex: 1; padding: 12px; border-radius: 8px; font-weight: bold; border: none; font-size: 15px; cursor: pointer; }
     .save-btn { background: #16a34a; color: #fff; }
     .cancel-btn { background: #e5e7eb; color: #333; }
+
+    /* QRカメラ枠 */
+    #qr-reader { width: 100%; border-radius: 8px; overflow: hidden; margin-bottom: 12px; }
   </style>
 </head>
 <body>
 
-  <div class="top-bar">
-    <button class="btn" onclick="loadPins()">🔄 更新</button>
-    <div style="background:rgba(255,255,255,0.9); padding:8px 12px; border-radius:8px; font-size:12px; font-weight:bold; pointer-events:auto;">
-      地図をタップで新規登録
+  <div class="top-container">
+    <div class="search-row">
+      <input type="text" id="searchInput" class="search-input" placeholder="住所・施設名で検索" onkeydown="if(event.key==='Enter') searchAddress()">
+      <button class="btn" onclick="searchAddress()">🔍</button>
+      <button class="btn btn-qr" onclick="openQrScanner()">📷 QR</button>
+      <button class="btn" onclick="loadPins()">🔄</button>
     </div>
+    <div id="searchResults" class="search-results"></div>
   </div>
 
   <button class="btn btn-gps" onclick="moveToCurrentLocation()">📍 現在地</button>
@@ -59,7 +87,20 @@
     </div>
   </div>
 
+  <!-- QRスキャナーモーダル -->
+  <div id="qrModal" class="modal">
+    <div class="modal-box">
+      <h3>📷 QRコードを読み取る</h3>
+      <div id="qr-reader"></div>
+      <div style="font-size:12px; color:#555; margin-bottom:10px;">
+        ※住所文字や地図URLが入ったQRコードを読み取ると自動で場所を検索します。
+      </div>
+      <button class="cancel-btn" style="width:100%; padding:12px; border-radius:8px; border:none; font-weight:bold;" onclick="closeQrScanner()">閉じる</button>
+    </div>
+  </div>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script>
     // ★1. ここにGASのウェブアプリURLを貼り付け
     const GAS_URL = "ここにGASのURLを貼る";
@@ -67,9 +108,9 @@
     // ★2. バイト共有用の合言葉（不要なら空文字 "" にする）
     const APP_PASS = "1234";
 
-    // ★3. 初期表示の中心座標（例：渋川市付近。拠点の緯度経度に変更してください）
-    const DEFAULT_LAT = 36.4910;
-    const DEFAULT_LNG = 139.0010;
+    // ★3. 初期表示の中心座標（配達エリアの中心に変更してください）
+    const DEFAULT_LAT = 42.5630;
+    const DEFAULT_LNG = 140.8220;
 
     // 合言葉チェック
     if (APP_PASS && localStorage.getItem("delivery_auth") !== APP_PASS) {
@@ -82,20 +123,183 @@
       }
     }
 
-    // スタッフ名を端末に記憶
     document.getElementById("inputStaff").value = localStorage.getItem("delivery_staff") || "";
 
-    const map = L.map('map').setView([DEFAULT_LAT, DEFAULT_LNG], 14);
-    L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', {
-      attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank'>地理院タイル</a>"
+    const map = L.map('map').setView([DEFAULT_LAT, DEFAULT_LNG], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
     let markersLayer = L.layerGroup().addTo(map);
+    let searchMarker = null;
     let currentData = [];
     let editingPin = null;
     let tempLatLng = null;
 
-    // データ読み込み
+    // 現在地マーカー＆誤差円
+    let myMarker = null;
+    let myCircle = null;
+    let lastPos = null;
+    const myIcon = L.divIcon({
+      className: 'current-loc-dot',
+      iconSize: [18, 18],
+      iconAnchor: [9, 9]
+    });
+
+    function updateMyLocation(pos, moveCamera) {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      const acc = pos.coords.accuracy;
+      lastPos = [lat, lng];
+
+      if (!myMarker) {
+        myMarker = L.marker([lat, lng], { icon: myIcon, zIndexOffset: 1000 })
+          .addTo(map)
+          .bindPopup("<b>現在地</b>");
+        myCircle = L.circle([lat, lng], {
+          radius: acc, color: '#2563eb', fillColor: '#3b82f6', fillOpacity: 0.15, weight: 1
+        }).addTo(map);
+      } else {
+        myMarker.setLatLng([lat, lng]);
+        myCircle.setLatLng([lat, lng]).setRadius(acc);
+      }
+      if (moveCamera) map.setView([lat, lng], 17);
+    }
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(pos => updateMyLocation(pos, true), () => {});
+      navigator.geolocation.watchPosition(pos => updateMyLocation(pos, false), () => {}, { enableHighAccuracy: true });
+    }
+
+    function moveToCurrentLocation() {
+      if (lastPos) map.setView(lastPos, 17);
+      if (!navigator.geolocation) { alert("GPSに対応していません"); return; }
+      navigator.geolocation.getCurrentPosition(pos => {
+        updateMyLocation(pos, true);
+      }, () => alert("現在地を取得できませんでした"), { enableHighAccuracy: true });
+    }
+
+    // ==========================================
+    // 住所・施設検索機能（国土地理院API ＋ OSM検索）
+    // ==========================================
+    async function searchAddress() {
+      const query = document.getElementById("searchInput").value.trim();
+      const resultsBox = document.getElementById("searchResults");
+      if (!query) { resultsBox.style.display = "none"; return; }
+
+      resultsBox.innerHTML = "<div class='search-item'>検索中...</div>";
+      resultsBox.style.display = "block";
+
+      try {
+        // 1. 日本の住所に強い国土地理院APIで検索
+        const gsiRes = await fetch(`https://msearch.gsi.go.jp/address-search/AddressSearch?q=${encodeURIComponent(query)}`);
+        const gsiData = await gsiRes.json();
+
+        let items = [];
+        if (gsiData && gsiData.length > 0) {
+          items = gsiData.slice(0, 6).map(d => ({
+            title: d.properties.title,
+            lat: d.geometry.coordinates[1],
+            lng: d.geometry.coordinates[0]
+          }));
+        }
+
+        // 2. ヒットが少ない場合は施設名なども探せるNominatimを追加検索
+        if (items.length < 3) {
+          const osmRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=jp&limit=5&q=${encodeURIComponent(query)}`);
+          const osmData = await osmRes.json();
+          osmData.forEach(d => {
+            items.push({
+              title: d.display_name.replace(/, 日本$/, ""),
+              lat: Number(d.lat),
+              lng: Number(d.lon)
+            });
+          });
+        }
+
+        if (items.length === 0) {
+          resultsBox.innerHTML = "<div class='search-item'>見つかりませんでした。番地を少し減らして試してください。</div>";
+          return;
+        }
+
+        resultsBox.innerHTML = "";
+        items.forEach(item => {
+          const div = document.createElement("div");
+          div.className = "search-item";
+          div.innerText = "📍 " + item.title;
+          div.onclick = () => selectSearchResult(item);
+          resultsBox.appendChild(div);
+        });
+      } catch (e) {
+        resultsBox.innerHTML = "<div class='search-item'>検索エラーが発生しました</div>";
+      }
+    }
+
+    function selectSearchResult(item) {
+      document.getElementById("searchResults").style.display = "none";
+      map.setView([item.lat, item.lng], 17);
+
+      if (searchMarker) map.removeLayer(searchMarker);
+      const gmapUrl = `https://www.google.com/maps/dir/?api=1&destination=${item.lat},${item.lng}`;
+      searchMarker = L.marker([item.lat, item.lng]).addTo(map)
+        .bindPopup(`
+          <div style="min-width:180px;">
+            <b>検索結果</b><br>
+            <div style="font-size:13px; margin:4px 0;">${esc(item.title)}</div>
+            <button class="popup-btn add-here" onclick="openAddAt(${item.lat}, ${item.lng}, '${esc(item.title)}')">＋ ここに配達メモ登録</button>
+            <a href="${gmapUrl}" target="_blank" class="popup-btn gmap">📍 Googleマップでナビ</a>
+          </div>
+        `).openPopup();
+    }
+
+    // ==========================================
+    // カメラQRコード読み取り機能
+    // ==========================================
+    let html5QrCode = null;
+
+    function openQrScanner() {
+      document.getElementById("qrModal").style.display = "flex";
+      html5QrCode = new Html5Qrcode("qr-reader");
+      html5QrCode.start(
+        { facingMode: "environment" }, // 背面カメラ起動
+        { fps: 10, qrbox: { width: 220, height: 220 } },
+        (decodedText) => {
+          closeQrScanner();
+          handleQrResult(decodedText);
+        },
+        () => {}
+      ).catch(err => {
+        alert("カメラを起動できませんでした。ブラウザのカメラ許可を確認してください。");
+        closeQrScanner();
+      });
+    }
+
+    function closeQrScanner() {
+      document.getElementById("qrModal").style.display = "none";
+      if (html5QrCode) {
+        html5QrCode.stop().then(() => html5QrCode.clear()).catch(() => {});
+        html5QrCode = null;
+      }
+    }
+
+    function handleQrResult(text) {
+      const clean = text.trim();
+      // 1. GoogleマップURLや緯度経度（35.xxx, 139.xxx）が含まれている場合
+      const coordMatch = clean.match(/(-?\d{1,2}\.\d{4,})[,\s/]+(-?\d{1,3}\.\d{4,})/);
+      if (coordMatch) {
+        const lat = Number(coordMatch[1]);
+        const lng = Number(coordMatch[2]);
+        selectSearchResult({ title: "QR座標 (" + lat.toFixed(5) + ", " + lng.toFixed(5) + ")", lat, lng });
+        return;
+      }
+      // 2. それ以外は住所・テキストとして検索ボックスに入れて自動検索
+      document.getElementById("searchInput").value = clean;
+      searchAddress();
+    }
+
+    // ==========================================
+    // ピン読み込み・登録・編集・削除
+    // ==========================================
     async function loadPins() {
       try {
         const res = await fetch(GAS_URL);
@@ -124,17 +328,20 @@
       });
     }
 
-    // 地図タップで新規登録モーダルを開く
     map.on('click', function(e) {
-      editingPin = null;
-      tempLatLng = e.latlng;
-      document.getElementById("modalTitle").innerText = "新規配達メモを登録";
-      document.getElementById("inputName").value = "";
-      document.getElementById("inputMemo").value = "";
-      document.getElementById("formModal").style.display = "flex";
+      document.getElementById("searchResults").style.display = "none";
+      openAddAt(e.latlng.lat, e.latlng.lng, "");
     });
 
-    // 編集モーダルを開く
+    function openAddAt(lat, lng, defaultName) {
+      editingPin = null;
+      tempLatLng = { lat, lng };
+      document.getElementById("modalTitle").innerText = "新規配達メモを登録";
+      document.getElementById("inputName").value = defaultName || "";
+      document.getElementById("inputMemo").value = "";
+      document.getElementById("formModal").style.display = "flex";
+    }
+
     function openEditModal(id) {
       const target = currentData.find(d => String(d.id) === String(id));
       if (!target) return;
@@ -149,7 +356,6 @@
       document.getElementById("formModal").style.display = "none";
     }
 
-    // 保存（新規・更新）
     async function savePin() {
       const name = document.getElementById("inputName").value.trim();
       const memo = document.getElementById("inputMemo").value.trim();
@@ -158,6 +364,7 @@
 
       localStorage.setItem("delivery_staff", staff);
       closeModal();
+      if (searchMarker) { map.removeLayer(searchMarker); searchMarker = null; }
 
       if (editingPin) {
         await fetch(GAS_URL, {
@@ -174,7 +381,6 @@
       loadPins();
     }
 
-    // 削除
     async function deletePin(id) {
       if (!confirm("この配達メモを削除しますか？")) return;
       await fetch(GAS_URL, {
@@ -182,14 +388,6 @@
         body: JSON.stringify({ action: "delete", id })
       });
       loadPins();
-    }
-
-    // 現在地へ移動
-    function moveToCurrentLocation() {
-      if (!navigator.geolocation) { alert("GPSに対応していません"); return; }
-      navigator.geolocation.getCurrentPosition(pos => {
-        map.setView([pos.coords.latitude, pos.coords.longitude], 17);
-      }, () => alert("現在地を取得できませんでした"));
     }
 
     function esc(str) {
