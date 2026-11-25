@@ -1,0 +1,8 @@
+{
+  "name": "宅配メモマップ",
+  "short_name": "宅配マップ",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb"
+}
