@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>宅配メモマップ</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    * { box-sizing: border-box; }
+    body, html { margin: 0; padding: 0; height: 100%; font-family: sans-serif; }
+    #map { width: 100%; height: 100%; }
+
+    /* 上部バー */
+    .top-bar { position: fixed; top: 10px; left: 10px; right: 10px; z-index: 1000; display: flex; gap: 8px; pointer-events: none; }
+    .btn { pointer-events: auto; padding: 10px 14px; background: #fff; border: 2px solid #333; border-radius: 8px; font-weight: bold; font-size: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.25); cursor: pointer; }
+    .btn-gps { position: fixed; bottom: 24px; right: 16px; z-index: 1000; background: #2563eb; color: #fff; border: none; padding: 14px 18px; border-radius: 50px; font-size: 15px; }
+
+    /* ポップアップ内ボタン */
+    .popup-btn { display: block; width: 100%; text-align: center; margin-top: 6px; padding: 8px; border-radius: 6px; font-weight: bold; text-decoration: none; border: none; cursor: pointer; font-size: 13px; }
+    .gmap { background: #4285F4; color: #fff; }
+    .edit { background: #f3f4f6; color: #111; border: 1px solid #ccc; }
+    .del { background: #fee2e2; color: #b91c1c; }
+
+    /* モーダル */
+    .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center; padding: 16px; }
+    .modal-box { background: #fff; width: 100%; max-width: 400px; border-radius: 12px; padding: 20px; }
+    .modal-box h3 { margin: 0 0 12px; }
+    .modal-box input, .modal-box textarea { width: 100%; padding: 10px; margin-bottom: 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; }
+    .modal-actions { display: flex; gap: 8px; }
+    .modal-actions button { flex: 1; padding: 12px; border-radius: 8px; font-weight: bold; border: none; font-size: 15px; cursor: pointer; }
+    .save-btn { background: #16a34a; color: #fff; }
+    .cancel-btn { background: #e5e7eb; color: #333; }
+  </style>
+</head>
+<body>
+
+  <div class="top-bar">
+    <button class="btn" onclick="loadPins()">🔄 更新</button>
+    <div style="background:rgba(255,255,255,0.9); padding:8px 12px; border-radius:8px; font-size:12px; font-weight:bold; pointer-events:auto;">
+      地図をタップで新規登録
+    </div>
+  </div>
+
+  <button class="btn btn-gps" onclick="moveToCurrentLocation()">📍 現在地</button>
+  <div id="map"></div>
+
+  <!-- 登録・編集モーダル -->
+  <div id="formModal" class="modal">
+    <div class="modal-box">
+      <h3 id="modalTitle">配達メモを登録</h3>
+      <input type="text" id="inputName" placeholder="建物名・表札・部屋番号（必須）">
+      <textarea id="inputMemo" rows="3" placeholder="オートロック番号、置き配場所、注意点など"></textarea>
+      <input type="text" id="inputStaff" placeholder="登録者名（例：佐藤）">
+      <div class="modal-actions">
+        <button class="cancel-btn" onclick="closeModal()">キャンセル</button>
+        <button class="save-btn" onclick="savePin()">保存する</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // ★1. ここにGASのウェブアプリURLを貼り付け
+    const GAS_URL = "ここにGASのURLを貼る";
+
+    // ★2. バイト共有用の合言葉（不要なら空文字 "" にする）
+    const APP_PASS = "1234";
+
+    // ★3. 初期表示の中心座標（例：渋川市付近。拠点の緯度経度に変更してください）
+    const DEFAULT_LAT = 36.4910;
+    const DEFAULT_LNG = 139.0010;
+
+    // 合言葉チェック
+    if (APP_PASS && localStorage.getItem("delivery_auth") !== APP_PASS) {
+      const input = prompt("スタッフ用パスワードを入力してください：");
+      if (input === APP_PASS) {
+        localStorage.setItem("delivery_auth", APP_PASS);
+      } else {
+        document.body.innerHTML = "<h3 style='padding:20px;'>パスワードが違います。再読み込みしてください。</h3>";
+        throw new Error("Auth failed");
+      }
+    }
+
+    // スタッフ名を端末に記憶
+    document.getElementById("inputStaff").value = localStorage.getItem("delivery_staff") || "";
+
+    const map = L.map('map').setView([DEFAULT_LAT, DEFAULT_LNG], 14);
+    L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', {
+      attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank'>地理院タイル</a>"
+    }).addTo(map);
+
+    let markersLayer = L.layerGroup().addTo(map);
+    let currentData = [];
+    let editingPin = null;
+    let tempLatLng = null;
+
+    // データ読み込み
+    async function loadPins() {
+      try {
+        const res = await fetch(GAS_URL);
+        currentData = await res.json();
+        renderPins();
+      } catch (e) {
+        alert("データの取得に失敗しました");
+      }
+    }
+
+    function renderPins() {
+      markersLayer.clearLayers();
+      currentData.forEach(item => {
+        const gmapUrl = `https://www.google.com/maps/dir/?api=1&destination=${item.lat},${item.lng}`;
+        const popupHtml = `
+          <div style="min-width:180px;">
+            <b style="font-size:15px;">${esc(item.name)}</b><br>
+            <div style="margin:6px 0; white-space:pre-wrap; font-size:13px;">${esc(item.memo)}</div>
+            <div style="font-size:11px; color:#666;">登録: ${esc(item.staff || "不明")}</div>
+            <a href="${gmapUrl}" target="_blank" class="popup-btn gmap">📍 Googleマップでナビ</a>
+            <button class="popup-btn edit" onclick="openEditModal('${item.id}')">✏️ メモを編集</button>
+            <button class="popup-btn del" onclick="deletePin('${item.id}')">🗑️ 削除</button>
+          </div>
+        `;
+        L.marker([item.lat, item.lng]).addTo(markersLayer).bindPopup(popupHtml);
+      });
+    }
+
+    // 地図タップで新規登録モーダルを開く
+    map.on('click', function(e) {
+      editingPin = null;
+      tempLatLng = e.latlng;
+      document.getElementById("modalTitle").innerText = "新規配達メモを登録";
+      document.getElementById("inputName").value = "";
+      document.getElementById("inputMemo").value = "";
+      document.getElementById("formModal").style.display = "flex";
+    });
+
+    // 編集モーダルを開く
+    function openEditModal(id) {
+      const target = currentData.find(d => String(d.id) === String(id));
+      if (!target) return;
+      editingPin = target;
+      document.getElementById("modalTitle").innerText = "配達メモを編集";
+      document.getElementById("inputName").value = target.name;
+      document.getElementById("inputMemo").value = target.memo;
+      document.getElementById("formModal").style.display = "flex";
+    }
+
+    function closeModal() {
+      document.getElementById("formModal").style.display = "none";
+    }
+
+    // 保存（新規・更新）
+    async function savePin() {
+      const name = document.getElementById("inputName").value.trim();
+      const memo = document.getElementById("inputMemo").value.trim();
+      const staff = document.getElementById("inputStaff").value.trim();
+      if (!name) { alert("建物名・表札を入力してください"); return; }
+
+      localStorage.setItem("delivery_staff", staff);
+      closeModal();
+
+      if (editingPin) {
+        await fetch(GAS_URL, {
+          method: "POST",
+          body: JSON.stringify({ action: "update", id: editingPin.id, name, memo, staff })
+        });
+      } else {
+        const newId = "pin_" + Date.now();
+        await fetch(GAS_URL, {
+          method: "POST",
+          body: JSON.stringify({ action: "add", id: newId, lat: tempLatLng.lat, lng: tempLatLng.lng, name, memo, staff })
+        });
+      }
+      loadPins();
+    }
+
+    // 削除
+    async function deletePin(id) {
+      if (!confirm("この配達メモを削除しますか？")) return;
+      await fetch(GAS_URL, {
+        method: "POST",
+        body: JSON.stringify({ action: "delete", id })
+      });
+      loadPins();
+    }
+
+    // 現在地へ移動
+    function moveToCurrentLocation() {
+      if (!navigator.geolocation) { alert("GPSに対応していません"); return; }
+      navigator.geolocation.getCurrentPosition(pos => {
+        map.setView([pos.coords.latitude, pos.coords.longitude], 17);
+      }, () => alert("現在地を取得できませんでした"));
+    }
+
+    function esc(str) {
+      return String(str || "").replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+    }
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js');
+    }
+
+    loadPins();
+  </script>
+</body>
+</html>
