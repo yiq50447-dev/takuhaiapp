@@ -8,16 +8,19 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     * { box-sizing: border-box; }
-    body, html { margin: 0; padding: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; background: #0f172a; }
+    body, html { margin: 0; padding: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; background: #090d16; }
+
+    /* アプリ本体（ログイン前は完全に非表示） */
+    #appMain { display: none; width: 100%; height: 100%; }
     #map { width: 100%; height: 100%; }
 
     /* ==========================================
-       1. 黒ベースのログイン画面
+       1. 黒ベースのログイン画面（起動時必ず表示）
     ========================================== */
     #loginScreen {
       position: fixed;
       inset: 0;
-      background: radial-gradient(circle at top, #1e293b 0%, #090d16 100%);
+      background: radial-gradient(circle at top, #1e293b 0%, #05080f 100%);
       color: #f8fafc;
       z-index: 9999;
       display: flex;
@@ -29,66 +32,74 @@
     .login-card {
       width: 100%;
       max-width: 360px;
-      background: rgba(30, 41, 59, 0.75);
-      border: 1px solid rgba(148, 163, 184, 0.2);
-      border-radius: 18px;
-      padding: 32px 24px;
-      box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+      background: rgba(15, 23, 42, 0.88);
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      border-radius: 20px;
+      padding: 34px 24px;
+      box-shadow: 0 24px 48px rgba(0,0,0,0.75);
       text-align: center;
-      backdrop-filter: blur(10px);
     }
     .app-logo-icon {
-      width: 60px;
-      height: 60px;
+      width: 64px;
+      height: 64px;
       margin: 0 auto 14px;
       background: linear-gradient(135deg, #2563eb, #10b981);
-      border-radius: 16px;
+      border-radius: 18px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 30px;
-      box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4);
+      font-size: 32px;
+      box-shadow: 0 8px 24px rgba(37, 99, 235, 0.45);
     }
-    .app-title { font-size: 24px; font-weight: 800; letter-spacing: 0.5px; margin: 0; }
-    .app-subtitle { font-size: 13px; color: #94a3b8; margin: 4px 0 8px; }
+    .app-title { font-size: 26px; font-weight: 800; letter-spacing: 0.5px; margin: 0; color: #fff; }
+    .app-subtitle { font-size: 13px; color: #94a3b8; margin: 4px 0 10px; }
     .app-version {
       display: inline-block;
-      background: rgba(15, 23, 42, 0.8);
+      background: #020617;
       border: 1px solid #334155;
       color: #38bdf8;
       font-size: 11px;
       font-weight: bold;
-      padding: 3px 10px;
+      padding: 3px 12px;
       border-radius: 20px;
       margin-bottom: 24px;
     }
+    .login-label {
+      display: block;
+      text-align: left;
+      font-size: 12px;
+      color: #cbd5e1;
+      margin-bottom: 6px;
+      font-weight: bold;
+    }
     .login-input {
       width: 100%;
-      padding: 13px 14px;
-      border-radius: 10px;
+      padding: 14px;
+      border-radius: 12px;
       border: 1px solid #334155;
-      background: #0f172a;
+      background: #020617;
       color: #fff;
-      font-size: 16px;
+      font-size: 18px;
       text-align: center;
-      letter-spacing: 3px;
-      margin-bottom: 14px;
+      letter-spacing: 4px;
+      margin-bottom: 16px;
       outline: none;
     }
-    .login-input:focus { border-color: #38bdf8; }
+    .login-input:focus { border-color: #38bdf8; box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2); }
     .login-btn {
       width: 100%;
-      padding: 13px;
-      border-radius: 10px;
+      padding: 14px;
+      border-radius: 12px;
       border: none;
       background: linear-gradient(135deg, #2563eb, #1d4ed8);
       color: #fff;
-      font-size: 15px;
+      font-size: 16px;
       font-weight: bold;
       cursor: pointer;
-      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.45);
     }
-    .login-error { color: #f87171; font-size: 12px; margin-top: 10px; min-height: 16px; }
+    .login-btn:active { transform: scale(0.98); }
+    .login-error { color: #f87171; font-size: 13px; margin-top: 12px; min-height: 18px; font-weight: bold; }
 
     /* ==========================================
        2. 上部検索＆メニューバー
@@ -132,7 +143,7 @@
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.55);
+      background: rgba(0,0,0,0.6);
       z-index: 2500;
     }
     .side-drawer {
@@ -152,7 +163,7 @@
     }
     .side-drawer.open { left: 0; }
     .drawer-header {
-      padding: 48px 16px 14px;
+      padding: 48px 16px 12px;
       background: #090d16;
       border-bottom: 1px solid #1f2937;
       display: flex;
@@ -161,7 +172,27 @@
     }
     .drawer-title { font-size: 17px; font-weight: bold; }
     .drawer-ver { font-size: 11px; color: #38bdf8; margin-left: 6px; }
-    .drawer-close { background: #1f2937; color: #fff; border: none; border-radius: 8px; padding: 6px 12px; font-size: 14px; cursor: pointer; }
+    .drawer-close { background: #1f2937; color: #fff; border: none; border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer; }
+    .drawer-staff-bar {
+      padding: 8px 16px;
+      background: #0f172a;
+      border-bottom: 1px solid #1e293b;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: #94a3b8;
+    }
+    .drawer-staff-bar b { color: #38bdf8; }
+    .btn-logout {
+      background: #334155;
+      color: #f8fafc;
+      border: none;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 11px;
+      cursor: pointer;
+    }
     .drawer-filter {
       padding: 10px 14px;
       background: #1e293b;
@@ -179,7 +210,7 @@
     .drawer-list {
       flex: 1;
       overflow-y: auto;
-      padding: 8px 12px;
+      padding: 12px;
     }
     .drawer-card {
       background: #1e293b;
@@ -267,59 +298,67 @@
 </head>
 <body>
 
-  <!-- 1. 黒ベースログイン画面 -->
+  <!-- 1. 黒ベースログイン画面（起動時必ず表示） -->
   <div id="loginScreen">
     <div class="login-card">
       <div class="app-logo-icon">🚚</div>
       <h1 class="app-title" id="loginAppTitle">HaisoLog</h1>
       <div class="app-subtitle">宅配ルート＆配達メモ共有マップ</div>
-      <div class="app-version" id="loginAppVersion">Version 1.2.0</div>
-      <input type="password" id="loginPassInput" class="login-input" placeholder="••••" inputmode="numeric" onkeydown="if(event.key==='Enter') submitLogin()">
-      <button class="login-btn" onclick="submitLogin()">ログイン</button>
+      <div class="app-version" id="loginAppVersion">Version 1.3.0</div>
+      <label class="login-label" for="loginCodeInput">社員コードを入力してください</label>
+      <input type="text" id="loginCodeInput" class="login-input" placeholder="例: 1001" inputmode="numeric" autocomplete="off" onkeydown="if(event.key==='Enter') submitLogin()">
+      <button class="login-btn" onclick="submitLogin()">ログインして地図を開く</button>
       <div class="login-error" id="loginError"></div>
     </div>
   </div>
 
-  <!-- 2. 左側一覧ドロワー -->
-  <div id="drawerBackdrop" class="drawer-backdrop" onclick="closeDrawer()"></div>
-  <aside id="sideDrawer" class="side-drawer">
-    <div class="drawer-header">
-      <div>
-        <span class="drawer-title" id="drawerAppTitle">HaisoLog</span>
-        <span class="drawer-ver" id="drawerAppVersion">v1.2.0</span>
+  <!-- 2. ログイン後に表示されるアプリ本体 -->
+  <div id="appMain">
+    <!-- 左側スライド一覧ドロワー -->
+    <div id="drawerBackdrop" class="drawer-backdrop" onclick="closeDrawer()"></div>
+    <aside id="sideDrawer" class="side-drawer">
+      <div class="drawer-header">
+        <div>
+          <span class="drawer-title" id="drawerAppTitle">HaisoLog</span>
+          <span class="drawer-ver" id="drawerAppVersion">v1.3.0</span>
+        </div>
+        <button class="drawer-close" onclick="closeDrawer()">✕ 閉じる</button>
       </div>
-      <button class="drawer-close" onclick="closeDrawer()">✕ 閉じる</button>
-    </div>
-    <div class="drawer-filter">
-      <input type="text" id="drawerFilterInput" placeholder="一覧を絞り込み（名前・住所・メモ）" oninput="renderDrawerList()">
-    </div>
-    <div id="drawerList" class="drawer-list"></div>
-  </aside>
-
-  <!-- 3. 上部検索バー -->
-  <div class="top-container">
-    <div class="search-row">
-      <button class="btn-menu" onclick="openDrawer()" title="登録一覧">≡</button>
-      <div class="search-box-wrap">
-        <input type="text" id="searchInput" class="search-input" placeholder="登録メモ・住所・座標を検索" oninput="onSearchInput()" onfocus="onSearchInput()" onkeydown="if(event.key==='Enter') executeSearch()">
-        <button id="clearSearchBtn" class="clear-input-btn" onclick="clearSearchInput()">✕</button>
+      <div class="drawer-staff-bar">
+        <span>担当: <b id="drawerStaffName">未設定</b></span>
+        <button class="btn-logout" onclick="logoutApp()">ログアウト</button>
       </div>
-      <button class="btn btn-qr" onclick="openQrScanner()">📷</button>
-      <button class="btn" onclick="loadPins()">🔄</button>
+      <div class="drawer-filter">
+        <input type="text" id="drawerFilterInput" placeholder="一覧を絞り込み（名前・住所・メモ）" oninput="renderDrawerList()">
+      </div>
+      <div id="drawerList" class="drawer-list"></div>
+    </aside>
+
+    <!-- 上部検索バー -->
+    <div class="top-container">
+      <div class="search-row">
+        <button class="btn-menu" onclick="openDrawer()" title="登録一覧">≡</button>
+        <div class="search-box-wrap">
+          <input type="text" id="searchInput" class="search-input" placeholder="登録メモ・住所・座標を検索" oninput="onSearchInput()" onfocus="onSearchInput()" onkeydown="if(event.key==='Enter') executeSearch()">
+          <button id="clearSearchBtn" class="clear-input-btn" onclick="clearSearchInput()">✕</button>
+        </div>
+        <button class="btn btn-qr" onclick="openQrScanner()">📷</button>
+        <button class="btn" onclick="loadPins()">🔄</button>
+      </div>
+      <div id="searchResults" class="search-results"></div>
     </div>
-    <div id="searchResults" class="search-results"></div>
-  </div>
 
-  <!-- 4. ルート案内バナー -->
-  <div id="routeBanner" class="route-banner">
-    <div class="route-info-text" id="routeInfoText">ルート計算中...</div>
-    <button class="route-clear-btn" onclick="clearRoute()">ルート終了</button>
-  </div>
+    <!-- ルート案内バナー -->
+    <div id="routeBanner" class="route-banner">
+      <div class="route-info-text" id="routeInfoText">ルート計算中...</div>
+      <button class="route-clear-btn" onclick="clearRoute()">ルート終了</button>
+    </div>
 
-  <!-- 5. 下部ステータス＆追尾ボタン -->
-  <div id="statusPill" class="status-pill" onclick="openDrawer()">📍 読込中...</div>
-  <button id="gpsTrackBtn" class="btn-gps tracking-on" onclick="toggleTracking()">🧭 追尾: ON</button>
-  <div id="map"></div>
+    <!-- 下部ステータス＆追尾ボタン -->
+    <div id="statusPill" class="status-pill" onclick="openDrawer()">📍 読込中...</div>
+    <button id="gpsTrackBtn" class="btn-gps tracking-on" onclick="toggleTracking()">🧭 追尾: ON</button>
+    <div id="map"></div>
+  </div>
 
   <!-- 登録・編集モーダル -->
   <div id="formModal" class="modal">
@@ -327,7 +366,7 @@
       <h3 id="modalTitle">配達メモを登録</h3>
       <input type="text" id="inputName" placeholder="住所・建物名・表札（必須）">
       <textarea id="inputMemo" rows="3" placeholder="オートロック番号、置き配場所、注意点など"></textarea>
-      <input type="text" id="inputStaff" placeholder="登録者名（例：佐藤）">
+      <input type="text" id="inputStaff" placeholder="登録者名">
       <div class="modal-actions">
         <button class="cancel-btn" onclick="closeModal()">キャンセル</button>
         <button class="save-btn" onclick="savePin()">保存する</button>
@@ -351,16 +390,34 @@
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script>
     // ==========================================
-    // アプリ基本設定（ここで名前やバージョンを変更可能）
+    // アプリ基本設定 ＆ 社員コード10名登録リスト
     // ==========================================
     const APP_NAME = "HaisoLog";
-    const APP_VERSION = "v1.2.0";
-    const APP_PASS = "1234"; // 空文字 "" にするとログイン画面をスキップ
+    const APP_VERSION = "v1.3.0";
+
+    // ★ここに社員コード（10人分）と名前を登録してください★
+    // 左側が入力する「社員コード」、右側が登録時に自動記録される「担当者名」です
+    const STAFF_LIST = {
+      "29772": "千葉",
+      "1002": "スタッフA",
+      "1003": "スタッフB",
+      "1004": "スタッフC",
+      "1005": "スタッフD",
+      "1006": "スタッフE",
+      "1007": "スタッフF",
+      "1008": "スタッフG",
+      "1009": "スタッフH",
+      "1010": "スタッフI"
+    };
 
     const GAS_URL = "https://script.google.com/macros/s/AKfycbxJnOzcP3Hq_oljFrjz_7TmkK3D17l4cDLcUNAjfQmiZqfzEzv4c3InT16mPh2Vrc8j/exec";
     const DEFAULT_LAT = 42.9018;
     const DEFAULT_LNG = 140.7586;
     const DEFAULT_AREA_PREFIX = "北海道虻田郡倶知安町";
+
+    let loggedInStaffName = "";
+    let map = null;
+    let markersLayer = null;
 
     // バージョン・アプリ名反映
     document.title = APP_NAME;
@@ -369,41 +426,56 @@
     document.getElementById("drawerAppTitle").innerText = APP_NAME;
     document.getElementById("drawerAppVersion").innerText = APP_VERSION;
 
-    // ログイン画面制御
-    function checkAuth() {
-      if (!APP_PASS || localStorage.getItem("delivery_auth") === APP_PASS) {
-        document.getElementById("loginScreen").style.display = "none";
-        return true;
-      }
-      return false;
+    // 起動時は必ずログイン画面を表示し、前回の入力履歴があればコード欄に補助セット（不要なら空でもOK）
+    const lastCode = localStorage.getItem("last_staff_code") || "";
+    if (lastCode && STAFF_LIST[lastCode]) {
+      document.getElementById("loginCodeInput").value = lastCode;
     }
 
+    // ==========================================
+    // ログイン処理（社員コード照合後に初めて地図を生成）
+    // ==========================================
     function submitLogin() {
-      const val = document.getElementById("loginPassInput").value.trim();
-      if (val === APP_PASS) {
-        localStorage.setItem("delivery_auth", APP_PASS);
+      // 全角数字を半角に変換
+      const rawCode = document.getElementById("loginCodeInput").value.trim()
+        .replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0));
+
+      if (!rawCode) {
+        document.getElementById("loginError").innerText = "社員コードを入力してください";
+        return;
+      }
+
+      if (STAFF_LIST[rawCode]) {
+        loggedInStaffName = STAFF_LIST[rawCode];
+        localStorage.setItem("last_staff_code", rawCode);
+
+        // 画面切り替え（黒ログイン画面を隠して地図画面を表示）
+        document.getElementById("loginError").innerText = "";
         document.getElementById("loginScreen").style.display = "none";
-        initAppAfterLogin();
+        document.getElementById("appMain").style.display = "block";
+
+        // 担当者名を自動セット
+        document.getElementById("drawerStaffName").innerText = `${loggedInStaffName} (${rawCode})`;
+        document.getElementById("inputStaff").value = loggedInStaffName;
+
+        initMapAndData();
       } else {
-        document.getElementById("loginError").innerText = "パスコードが正しくありません";
+        document.getElementById("loginError").innerText = "登録されていない社員コードです";
       }
     }
 
-    document.getElementById("inputStaff").value = localStorage.getItem("delivery_staff") || "";
+    function logoutApp() {
+      closeDrawer();
+      document.getElementById("appMain").style.display = "none";
+      document.getElementById("loginScreen").style.display = "flex";
+    }
 
     // ==========================================
     // 地図初期化 ＆ 追尾スクロール機能
     // ==========================================
-    const map = L.map('map').setView([DEFAULT_LAT, DEFAULT_LNG], 15);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
-
-    let markersLayer = L.layerGroup().addTo(map);
     let markerMap = {};
     let draftMarker = null;
     let routeLayer = null;
-    let routeDest = null;
     let currentData = [];
     let editingPin = null;
     let tempLatLng = null;
@@ -411,7 +483,7 @@
     let myMarker = null;
     let myCircle = null;
     let lastPos = null;
-    let isTracking = true; // デフォルトで位置情報追尾ON
+    let isTracking = true;
 
     const myIcon = L.divIcon({
       className: 'current-loc-dot',
@@ -427,13 +499,38 @@
       popupAnchor: [0, -28]
     });
 
+    function initMapAndData() {
+      if (!map) {
+        map = L.map('map').setView([DEFAULT_LAT, DEFAULT_LNG], 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        markersLayer = L.layerGroup().addTo(map);
+
+        map.on('dragstart', function() {
+          if (isTracking) setTrackingState(false);
+        });
+
+        map.on('click', function(e) {
+          document.getElementById("searchResults").style.display = "none";
+          placeDraftPin(e.latlng.lat, e.latlng.lng, "");
+        });
+
+        startGpsWatch();
+      } else {
+        map.invalidateSize();
+      }
+      loadPins();
+    }
+
     function setTrackingState(state) {
       isTracking = state;
       const btn = document.getElementById("gpsTrackBtn");
       if (isTracking) {
         btn.classList.add("tracking-on");
         btn.innerText = "🧭 追尾: ON";
-        if (lastPos) map.panTo(lastPos, { animate: true });
+        if (lastPos && map) map.panTo(lastPos, { animate: true });
       } else {
         btn.classList.remove("tracking-on");
         btn.innerText = "🧭 追尾: OFF";
@@ -453,12 +550,8 @@
       }
     }
 
-    // ユーザーが指で地図をドラッグしたら自動で追尾OFFにする（操作性向上）
-    map.on('dragstart', function() {
-      if (isTracking) setTrackingState(false);
-    });
-
     function updateMyLocation(pos, forceMove) {
+      if (!map) return;
       const lat = pos.coords.latitude;
       const lng = pos.coords.longitude;
       const acc = pos.coords.accuracy;
@@ -499,7 +592,6 @@
         return;
       }
 
-      routeDest = { lat: destLat, lng: destLng, name: destName };
       const banner = document.getElementById("routeBanner");
       const infoText = document.getElementById("routeInfoText");
       banner.style.display = "flex";
@@ -527,7 +619,6 @@
           opacity: 0.85
         }).addTo(map);
 
-        // ルート全体が見えるようにズーム調整（追尾は一時OFF）
         setTrackingState(false);
         map.fitBounds(routeLayer.getBounds(), { padding: [60, 60] });
 
@@ -542,7 +633,6 @@
         map.removeLayer(routeLayer);
         routeLayer = null;
       }
-      routeDest = null;
       document.getElementById("routeBanner").style.display = "none";
     }
 
@@ -891,11 +981,6 @@
       }
     }
 
-    map.on('click', function(e) {
-      document.getElementById("searchResults").style.display = "none";
-      placeDraftPin(e.latlng.lat, e.latlng.lng, "");
-    });
-
     // ==========================================
     // QRスキャナー
     // ==========================================
@@ -983,6 +1068,7 @@
       document.getElementById("modalTitle").innerText = "新規配達メモを登録";
       document.getElementById("inputName").value = defaultName || "";
       document.getElementById("inputMemo").value = "";
+      document.getElementById("inputStaff").value = loggedInStaffName;
       document.getElementById("formModal").style.display = "flex";
     }
 
@@ -993,6 +1079,7 @@
       document.getElementById("modalTitle").innerText = "配達メモを編集";
       document.getElementById("inputName").value = target.name;
       document.getElementById("inputMemo").value = target.memo;
+      document.getElementById("inputStaff").value = loggedInStaffName || target.staff;
       document.getElementById("formModal").style.display = "flex";
     }
 
@@ -1003,10 +1090,9 @@
     async function savePin() {
       const name = document.getElementById("inputName").value.trim();
       const memo = document.getElementById("inputMemo").value.trim();
-      const staff = document.getElementById("inputStaff").value.trim();
+      const staff = document.getElementById("inputStaff").value.trim() || loggedInStaffName;
       if (!name) { alert("建物名・表札を入力してください"); return; }
 
-      localStorage.setItem("delivery_staff", staff);
       closeModal();
       clearDraftPin();
 
@@ -1038,18 +1124,8 @@
       return String(str || "").replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
     }
 
-    function initAppAfterLogin() {
-      startGpsWatch();
-      loadPins();
-    }
-
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js');
-    }
-
-    // 起動時認証チェック
-    if (checkAuth()) {
-      initAppAfterLogin();
     }
   </script>
 </body>
