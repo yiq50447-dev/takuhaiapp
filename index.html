@@ -13,22 +13,25 @@
 
     /* 上部検索＆操作バー */
     .top-container { position: fixed; top: 54px; left: 12px; right: 12px; z-index: 1000; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
-    .search-row { display: flex; gap: 6px; pointer-events: auto; }
-    .search-input { flex: 1; padding: 11px 12px; border: 2px solid #333; border-radius: 10px; font-size: 15px; background: #fff; box-shadow: 0 3px 8px rgba(0,0,0,0.2); min-width: 0; }
+    .search-row { display: flex; gap: 6px; pointer-events: auto; align-items: center; }
+    .search-box-wrap { flex: 1; position: relative; display: flex; align-items: center; min-width: 0; }
+    .search-input { width: 100%; padding: 11px 34px 11px 12px; border: 2px solid #333; border-radius: 10px; font-size: 15px; background: #fff; box-shadow: 0 3px 8px rgba(0,0,0,0.2); }
+    .clear-input-btn { position: absolute; right: 8px; background: #e5e7eb; border: none; border-radius: 50%; width: 22px; height: 22px; font-size: 12px; color: #333; cursor: pointer; display: none; align-items: center; justify-content: center; }
     .btn { pointer-events: auto; padding: 10px 12px; background: #fff; border: 2px solid #333; border-radius: 10px; font-weight: bold; font-size: 14px; box-shadow: 0 3px 8px rgba(0,0,0,0.2); cursor: pointer; white-space: nowrap; }
     .btn-qr { background: #111827; color: #fff; border-color: #111827; }
 
     /* ズームボタンを検索バーの下へ移動 */
     .leaflet-top.leaflet-left { top: 108px !important; left: 2px !important; }
 
-    /* 検索結果リスト */
-    .search-results { pointer-events: auto; background: #fff; border-radius: 10px; box-shadow: 0 4px 14px rgba(0,0,0,0.3); max-height: 260px; overflow-y: auto; display: none; border: 1px solid #ddd; }
-    .search-item { padding: 12px; border-bottom: 1px solid #eee; font-size: 14px; cursor: pointer; line-height: 1.4; }
+    /* 予測検索結果リスト */
+    .search-results { pointer-events: auto; background: #fff; border-radius: 10px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); max-height: 290px; overflow-y: auto; display: none; border: 1px solid #ccc; }
+    .search-item { padding: 11px 12px; border-bottom: 1px solid #eee; font-size: 14px; cursor: pointer; line-height: 1.4; }
     .search-item:last-child { border-bottom: none; }
     .search-item:active { background: #f3f4f6; }
-    .badge-saved { display: inline-block; background: #16a34a; color: #fff; font-size: 11px; font-weight: bold; padding: 2px 6px; border-radius: 4px; margin-right: 4px; }
-    .badge-approx { display: inline-block; background: #f59e0b; color: #fff; font-size: 11px; font-weight: bold; padding: 2px 6px; border-radius: 4px; margin-right: 4px; }
-    .badge-dist { display: inline-block; background: #e5e7eb; color: #374151; font-size: 11px; padding: 2px 6px; border-radius: 4px; margin-left: 4px; }
+    .badge-saved { display: inline-block; background: #16a34a; color: #fff; font-size: 11px; font-weight: bold; padding: 2px 6px; border-radius: 4px; margin-right: 5px; }
+    .badge-addr { display: inline-block; background: #2563eb; color: #fff; font-size: 11px; font-weight: bold; padding: 2px 6px; border-radius: 4px; margin-right: 5px; }
+    .badge-approx { display: inline-block; background: #f59e0b; color: #fff; font-size: 11px; font-weight: bold; padding: 2px 6px; border-radius: 4px; margin-right: 5px; }
+    .badge-dist { display: inline-block; background: #e5e7eb; color: #374151; font-size: 11px; padding: 2px 6px; border-radius: 4px; margin-left: 5px; }
 
     /* 下部ステータス＆現在地ボタン */
     .status-pill { position: fixed; bottom: 32px; left: 14px; z-index: 1000; background: rgba(255,255,255,0.92); border: 1px solid #ccc; padding: 8px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
@@ -78,8 +81,10 @@
 
   <div class="top-container">
     <div class="search-row">
-      <input type="text" id="searchInput" class="search-input" placeholder="登録メモ・住所・番地・座標を検索" onkeydown="if(event.key==='Enter') searchAddress()">
-      <button class="btn" onclick="searchAddress()">🔍</button>
+      <div class="search-box-wrap">
+        <input type="text" id="searchInput" class="search-input" placeholder="例: 倶知安 北1条 / 建物名 / メモ" oninput="onSearchInput()" onfocus="onSearchInput()" onkeydown="if(event.key==='Enter') executeSearch(true)">
+        <button id="clearSearchBtn" class="clear-input-btn" onclick="clearSearchInput()">✕</button>
+      </div>
       <button class="btn btn-qr" onclick="openQrScanner()">📷 QR</button>
       <button class="btn" onclick="loadPins()">🔄</button>
     </div>
@@ -94,7 +99,7 @@
   <div id="formModal" class="modal">
     <div class="modal-box">
       <h3 id="modalTitle">配達メモを登録</h3>
-      <input type="text" id="inputName" placeholder="建物名・表札・住所（必須）">
+      <input type="text" id="inputName" placeholder="住所・建物名・表札（必須）">
       <textarea id="inputMemo" rows="3" placeholder="オートロック番号、置き配場所、注意点など"></textarea>
       <input type="text" id="inputStaff" placeholder="登録者名（例：佐藤）">
       <div class="modal-actions">
@@ -123,6 +128,8 @@
     const APP_PASS = "1234";
     const DEFAULT_LAT = 42.9018;
     const DEFAULT_LNG = 140.7586;
+    // 省略検索時に自動補完するベース地域名
+    const DEFAULT_AREA_PREFIX = "北海道虻田郡倶知安町";
 
     if (APP_PASS && localStorage.getItem("delivery_auth") !== APP_PASS) {
       const input = prompt("スタッフ用パスワードを入力してください：");
@@ -208,60 +215,75 @@
       return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
-    // 全角・漢数字・ハイフン・空白を統一して比較しやすくする関数
-    function normalizeForSearch(str) {
+    // 表記ゆれ吸収（全角→半角、漢数字→算用数字、ハイフン統一）
+    function normalizeText(str) {
       const kanjiMap = {'一':'1','二':'2','三':'3','四':'4','五':'5','六':'6','七':'7','八':'8','九':'9','〇':'0'};
       return String(str || "")
         .replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
         .replace(/[一二三四五六七八九〇]/g, s => kanjiMap[s] || s)
         .replace(/[ー－―‐]/g, "-")
-        .replace(/[\s　]+/g, "")
         .toLowerCase();
     }
 
-    function normalizeAddr(str) {
-      return String(str || "")
-        .replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
-        .replace(/[ー－―‐]/g, "-");
+    // 入力された文字列を「検索キーワードの塊」に分解（例: "倶知安北1条東3" → ["倶知安", "北1条", "東3"]）
+    function tokenizeQuery(raw) {
+      const norm = normalizeText(raw).trim();
+      if (!norm) return [];
+      // スペース区切りがあれば分割、さらに「北1条東3丁目」のような連続文字も境界で分割してAND検索しやすくする
+      const spaceParts = norm.split(/[\s　,、]+/).filter(Boolean);
+      const tokens = [];
+      spaceParts.forEach(part => {
+        // 「北海道」「虻田郡」が入力されていてもいなくても比較できるように除去したトークンも作る
+        const cleaned = part.replace(/^(北海道|虻田郡)/g, "");
+        if (cleaned) tokens.push(cleaned);
+      });
+      return tokens;
     }
 
     // ==========================================
-    // 登録済 ＋ 番地自動短縮検索 ＋ 座標検索
+    // リアルタイム入力予測（オートコンプリート）
     // ==========================================
-    async function searchAddress() {
-      const rawQuery = document.getElementById("searchInput").value.trim();
-      const resultsBox = document.getElementById("searchResults");
-      if (!rawQuery) { resultsBox.style.display = "none"; return; }
+    let searchTimer = null;
 
-      // 1. 緯度・経度が直接入力された場合
-      const coordMatch = rawQuery.match(/^(-?\d{1,2}\.\d{4,})[,\s/]+(-?\d{1,3}\.\d{4,})$/);
-      if (coordMatch) {
-        resultsBox.style.display = "none";
-        const lat = Number(coordMatch[1]);
-        const lng = Number(coordMatch[2]);
-        placeDraftPin(lat, lng, "指定座標 (" + lat.toFixed(5) + ", " + lng.toFixed(5) + ")");
+    function onSearchInput() {
+      const val = document.getElementById("searchInput").value;
+      const clearBtn = document.getElementById("clearSearchBtn");
+      clearBtn.style.display = val ? "flex" : "none";
+
+      if (!val.trim()) {
+        document.getElementById("searchResults").style.display = "none";
         return;
       }
 
-      resultsBox.innerHTML = "<div class='search-item'>検索中...</div>";
-      resultsBox.style.display = "block";
+      // 1. まずスプレッドシート内の登録メモを「0ミリ秒（即座）」に予測表示
+      renderSavedInstant(val);
 
-      // 念のため最新データを裏で再取得してから検索
-      try {
-        const res = await fetch(GAS_URL + "?t=" + Date.now());
-        currentData = await res.json();
-        renderPins();
-      } catch (e) {}
+      // 2. 入力が0.35秒止まったら外部の住所候補も取得して合流させる
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => {
+        executeSearch(false);
+      }, 350);
+    }
 
-      const query = normalizeAddr(rawQuery);
+    function clearSearchInput() {
+      const input = document.getElementById("searchInput");
+      input.value = "";
+      document.getElementById("clearSearchBtn").style.display = "none";
+      document.getElementById("searchResults").style.display = "none";
+      input.focus();
+    }
+
+    function getSavedMatches(rawQuery) {
       const center = lastPos ? { lat: lastPos[0], lng: lastPos[1] } : map.getCenter();
-      const qNorm = normalizeForSearch(rawQuery);
+      const tokens = tokenizeQuery(rawQuery);
+      if (tokens.length === 0) return [];
 
-      // 2. スプレッドシートの登録済メモから検索（漢数字・全角・スペースゆれ吸収）
-      const savedMatches = currentData
+      return currentData
         .filter(d => {
-          const targetText = normalizeForSearch((d.name || "") + " " + (d.memo || "") + " " + (d.staff || ""));
-          return targetText.includes(qNorm);
+          // 登録データの住所・建物名・メモ・担当者名を連結して、スペースを詰めた文字列を作る
+          const targetCompact = normalizeText((d.name || "") + " " + (d.memo || "") + " " + (d.staff || "")).replace(/[\s　]+/g, "");
+          // 入力されたすべてのキーワードが含まれていればヒット（「虻田郡」が抜けていてもOK）
+          return tokens.every(t => targetCompact.includes(t));
         })
         .map(d => ({
           type: "saved",
@@ -273,27 +295,92 @@
           dist: calcDistanceKm(center.lat, center.lng, d.lat, d.lng)
         }))
         .sort((a, b) => a.dist - b.dist);
+    }
 
-      // 3. 住所検索（番地まで入ってヒットしない場合は自動短縮して再検索）
+    function renderSavedInstant(rawQuery) {
+      const resultsBox = document.getElementById("searchResults");
+      const savedMatches = getSavedMatches(rawQuery);
+
+      resultsBox.style.display = "block";
+      resultsBox.innerHTML = "";
+
+      savedMatches.forEach(item => {
+        resultsBox.appendChild(createSavedItemEl(item));
+      });
+
+      const loadingDiv = document.createElement("div");
+      loadingDiv.id = "webLoadingHint";
+      loadingDiv.className = "search-item";
+      loadingDiv.style.color = "#666";
+      loadingDiv.style.fontSize = "12px";
+      loadingDiv.innerText = "住所候補を検索中...";
+      resultsBox.appendChild(loadingDiv);
+    }
+
+    function createSavedItemEl(item) {
+      const div = document.createElement("div");
+      div.className = "search-item";
+      const distText = item.dist < 1 ? `${Math.round(item.dist * 1000)}m` : `${item.dist.toFixed(1)}km`;
+      div.innerHTML = `<span class="badge-saved">登録済</span><b>${esc(item.title)}</b><span class="badge-dist">${distText}</span>` +
+                      (item.sub ? `<div style="font-size:12px; color:#555; margin-top:2px;">${esc(item.sub)}</div>` : "");
+      div.onclick = () => {
+        document.getElementById("searchResults").style.display = "none";
+        map.setView([item.lat, item.lng], 17);
+        if (markerMap[item.id]) markerMap[item.id].openPopup();
+      };
+      return div;
+    }
+
+    async function executeSearch(isEnterKey) {
+      const rawQuery = document.getElementById("searchInput").value.trim();
+      const resultsBox = document.getElementById("searchResults");
+      if (!rawQuery) { resultsBox.style.display = "none"; return; }
+
+      // 緯度・経度が直接入力された場合
+      const coordMatch = rawQuery.match(/^(-?\d{1,2}\.\d{4,})[,\s/]+(-?\d{1,3}\.\d{4,})$/);
+      if (coordMatch) {
+        resultsBox.style.display = "none";
+        const lat = Number(coordMatch[1]);
+        const lng = Number(coordMatch[2]);
+        placeDraftPin(lat, lng, "指定座標 (" + lat.toFixed(5) + ", " + lng.toFixed(5) + ")");
+        return;
+      }
+
+      const center = lastPos ? { lat: lastPos[0], lng: lastPos[1] } : map.getCenter();
+      const savedMatches = getSavedMatches(rawQuery);
+
+      // 住所検索用のクエリ整形（スペース削除・全角→半角）
+      const cleanAddr = normalizeText(rawQuery).replace(/[\s　]+/g, "");
+      // 「北海道」や「倶知安」が抜けていたら補完したクエリも作る（例: "北1条東3" → "北海道虻田郡倶知安町北1条東3"）
+      let expandedAddr = cleanAddr;
+      if (!cleanAddr.includes("倶知安") && !cleanAddr.includes("北海道") && !cleanAddr.includes("ニセコ") && !cleanAddr.includes("京極")) {
+        expandedAddr = DEFAULT_AREA_PREFIX + cleanAddr;
+      } else if (cleanAddr.includes("倶知安") && !cleanAddr.includes("北海道")) {
+        expandedAddr = "北海道虻田郡" + cleanAddr.replace(/^倶知安町?/, "倶知安町");
+      }
+
+      // 番地削りバリエーションも用意
+      const stripBanchi = s => s.replace(/(\d+番地?\d*号?|\d+-\d+(-\d+)?|\d+号)$/, "");
+      const queriesToTry = Array.from(new Set([
+        expandedAddr,
+        cleanAddr,
+        stripBanchi(expandedAddr),
+        stripBanchi(cleanAddr)
+      ])).filter(s => s && s.length >= 2);
+
       let webMatches = [];
       let isApprox = false;
-
-      const queriesToTry = [query];
-      const stripped1 = query.replace(/(\d+番地?\d*号?|\d+-\d+(-\d+)?|\d+号)$/, "").trim();
-      if (stripped1 && stripped1 !== query) queriesToTry.push(stripped1);
-      const stripped2 = stripped1.replace(/\d+$/, "").trim();
-      if (stripped2 && stripped2 !== stripped1 && stripped2.length >= 2) queriesToTry.push(stripped2);
 
       for (let i = 0; i < queriesToTry.length; i++) {
         const qTry = queriesToTry[i];
         try {
-          const dLat = 0.14;
-          const dLng = 0.18;
+          const dLat = 0.15;
+          const dLng = 0.20;
           const viewbox = `${center.lng - dLng},${center.lat + dLat},${center.lng + dLng},${center.lat - dLat}`;
 
           const [gsiRes, osmRes] = await Promise.all([
             fetch(`https://msearch.gsi.go.jp/address-search/AddressSearch?q=${encodeURIComponent(qTry)}`).then(r => r.json()).catch(() => []),
-            fetch(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=jp&viewbox=${viewbox}&bounded=0&limit=8&q=${encodeURIComponent(qTry)}`).then(r => r.json()).catch(() => [])
+            fetch(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=jp&viewbox=${viewbox}&bounded=0&limit=6&q=${encodeURIComponent(qTry)}`).then(r => r.json()).catch(() => [])
           ]);
 
           gsiRes.forEach(d => {
@@ -321,37 +408,40 @@
           });
 
           if (webMatches.length > 0) {
-            if (i > 0) isApprox = true;
+            if (i >= 2) isApprox = true;
             break;
           }
         } catch (e) {}
       }
 
-      webMatches.sort((a, b) => a.dist - b.dist);
-      webMatches = webMatches.slice(0, 7);
+      // 入力途中で文字が変わっていたら古い通信結果は破棄
+      if (document.getElementById("searchInput").value.trim() !== rawQuery) return;
 
+      // 重複タイトルを整理して距離順に並べる
+      const seen = new Set();
+      webMatches = webMatches
+        .sort((a, b) => a.dist - b.dist)
+        .filter(item => {
+          const key = item.title + item.lat.toFixed(4);
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .slice(0, 7);
+
+      resultsBox.style.display = "block";
       resultsBox.innerHTML = "";
 
       savedMatches.forEach(item => {
-        const div = document.createElement("div");
-        div.className = "search-item";
-        const distText = item.dist < 1 ? `${Math.round(item.dist * 1000)}m` : `${item.dist.toFixed(1)}km`;
-        div.innerHTML = `<span class="badge-saved">登録済</span><b>${esc(item.title)}</b><span class="badge-dist">${distText}</span>` +
-                        (item.sub ? `<div style="font-size:12px; color:#555; margin-top:2px;">${esc(item.sub)}</div>` : "");
-        div.onclick = () => {
-          resultsBox.style.display = "none";
-          map.setView([item.lat, item.lng], 17);
-          if (markerMap[item.id]) markerMap[item.id].openPopup();
-        };
-        resultsBox.appendChild(div);
+        resultsBox.appendChild(createSavedItemEl(item));
       });
 
       webMatches.forEach(item => {
         const div = document.createElement("div");
         div.className = "search-item";
         const distText = item.dist < 1 ? `${Math.round(item.dist * 1000)}m` : `${item.dist.toFixed(1)}km`;
-        const approxBadge = isApprox ? `<span class="badge-approx">付近エリア</span>` : "";
-        div.innerHTML = `${approxBadge}📍 ${esc(item.title)}<span class="badge-dist">${distText}</span>`;
+        const badge = isApprox ? `<span class="badge-approx">付近エリア</span>` : `<span class="badge-addr">住所候補</span>`;
+        div.innerHTML = `${badge}${esc(item.title)}<span class="badge-dist">${distText}</span>`;
         div.onclick = () => {
           resultsBox.style.display = "none";
           placeDraftPin(item.lat, item.lng, isApprox ? rawQuery : item.title);
@@ -359,31 +449,44 @@
         resultsBox.appendChild(div);
       });
 
+      // Googleマップアプリで直接見るリンク
       const gmapSearchDiv = document.createElement("div");
       gmapSearchDiv.className = "search-item";
       gmapSearchDiv.style.background = "#eff6ff";
       gmapSearchDiv.style.color = "#1d4ed8";
       gmapSearchDiv.style.fontWeight = "bold";
-      gmapSearchDiv.innerHTML = `🗺️ Googleマップアプリで「${esc(rawQuery)}」の番地を見る ↗`;
+      gmapSearchDiv.innerHTML = `🗺️ Googleマップアプリで「${esc(rawQuery)}」を開く ↗`;
       gmapSearchDiv.onclick = () => {
         window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(rawQuery)}`, "_blank");
       };
       resultsBox.appendChild(gmapSearchDiv);
     }
 
-    function placeDraftPin(lat, lng, defaultName) {
+    // 地図タップ時に逆ジオコーディングで住所名を自動取得して仮ピンを立てる
+    async function placeDraftPin(lat, lng, defaultName) {
       if (draftMarker) map.removeLayer(draftMarker);
       map.setView([lat, lng], Math.max(map.getZoom(), 17));
 
+      let resolvedName = defaultName;
+      if (!resolvedName) {
+        try {
+          const res = await fetch(`https://mreversegeocoder.gsi.go.jp/reverse-geocoder/LonLatToAddress?lat=${lat}&lon=${lng}`);
+          const data = await res.json();
+          if (data && data.results && data.results.lv01Nm) {
+            resolvedName = data.results.lv01Nm;
+          }
+        } catch (e) {}
+      }
+
       const gmapUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
-      const label = defaultName ? `<b>${esc(defaultName)}</b><br>` : `<b>選択した場所</b><br>`;
+      const label = resolvedName ? `<b>${esc(resolvedName)}</b><br>` : `<b>選択した場所</b><br>`;
 
       draftMarker = L.marker([lat, lng], { icon: draftIcon, zIndexOffset: 900 }).addTo(map)
         .bindPopup(`
           <div style="min-width:190px;">
             ${label}
-            <div style="font-size:11px; color:#666; margin-bottom:6px;">ズレている場合は正確な建物の場所をタップして調整できます</div>
-            <button class="popup-btn add-here" onclick="openAddAt(${lat}, ${lng}, '${esc(defaultName || "")}')">＋ ここに配達メモを登録</button>
+            <div style="font-size:11px; color:#666; margin-bottom:6px;">ズレている場合は建物の位置をタップして調整できます</div>
+            <button class="popup-btn add-here" onclick="openAddAt(${lat}, ${lng}, '${esc(resolvedName || "")}')">＋ ここに配達メモを登録</button>
             <a href="${gmapUrl}" target="_blank" class="popup-btn gmap">📍 Googleマップでナビ</a>
             <button class="popup-btn edit" onclick="clearDraftPin()">✕ ピンを消す</button>
           </div>
@@ -439,7 +542,7 @@
         return;
       }
       document.getElementById("searchInput").value = clean;
-      searchAddress();
+      onSearchInput();
     }
 
     async function loadPins() {
